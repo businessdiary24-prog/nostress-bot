@@ -13,7 +13,7 @@ from telegram.ext import (
 )
 
 logging.basicConfig(format="%(asctime)s - %(name)s - %(levelname)s - %(message)s", level=logging.INFO)
-logger.info(f"LEADS_CHAT_ID = '{os.getenv('LEADS_CHAT_ID')}'")
+logging.info(f"LEADS_CHAT_ID = '{os.getenv('LEADS_CHAT_ID')}'")
 logger = logging.getLogger(__name__)
 
 
