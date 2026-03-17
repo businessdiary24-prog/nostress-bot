@@ -177,7 +177,7 @@ def main():
         allow_reentry=True,
     )
     app.add_handler(conv_handler)
-    logger.info("✅ Бот nostressbyruleva запущен!")
+    logger.info("✅ Бот nostressbyruleva запущен")
     app.run_polling(allowed_updates=Update.ALL_TYPES)
 
 
