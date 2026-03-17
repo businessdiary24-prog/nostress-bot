@@ -16,7 +16,8 @@ logging.basicConfig(format="%(asctime)s - %(name)s - %(levelname)s - %(message)s
 logger = logging.getLogger(__name__)
 
 TOKEN          = os.getenv("BOT_TOKEN", "8784647952:AAHzGHp1LoN3wFSyMWdkuX3nboNpEsJbL_4")
-ADMIN_CHAT_ID  = os.getenv("ADMIN_CHAT_ID", "")
+ADMIN_CHAT_ID  = os.getenv("ADMIN_CHAT_ID", "")   # твой личный чат — уведомления
+LEADS_CHAT_ID  = os.getenv("LEADS_CHAT_ID", "")    # приватный канал — база лидов
 
 DOCS_DIR        = "docs"
 POLICY_FILE     = os.path.join(DOCS_DIR, "Политика_обработки_ПД.pdf")
@@ -130,9 +131,9 @@ def get_question_keyboard(idx):
 
 
 async def save_lead(bot, telegram_id, telegram_username, first_name, email, phone, instagram, score=None, level=None):
-    """Сохраняет лид в приватный Telegram-канал."""
-    if not ADMIN_CHAT_ID:
-        logger.warning("ADMIN_CHAT_ID не задан — лид не сохранён")
+    """Сохраняет лид в приватный Telegram-канал (LEADS_CHAT_ID)."""
+    if not LEADS_CHAT_ID:
+        logger.warning("LEADS_CHAT_ID не задан — лид не сохранён")
         return
     try:
         score_line = f"\n📊 Баллы: {score} — {level}" if score is not None else ""
@@ -147,7 +148,7 @@ async def save_lead(bot, telegram_id, telegram_username, first_name, email, phon
             f"{score_line}\n"
             f"🕐 {datetime.now().strftime('%d.%m.%Y %H:%M')}"
         )
-        await bot.send_message(chat_id=ADMIN_CHAT_ID, text=text)
+        await bot.send_message(chat_id=LEADS_CHAT_ID, text=text)
         logger.info(f"Лид сохранён в канал: {email}")
     except Exception as e:
         logger.error(f"Ошибка сохранения лида: {e}")
