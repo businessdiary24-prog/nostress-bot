@@ -24,7 +24,7 @@ DOCS_DIR        = "docs"
 POLICY_FILE     = os.path.join(DOCS_DIR, "Политика_обработки_ПД.pdf")
 CONSENT_FILE    = os.path.join(DOCS_DIR, "Согласие_на_обработку_ПД.pdf")
 NEWSLETTER_FILE = os.path.join(DOCS_DIR, "Согласие_на_рассылку.pdf")
-CHECKLIST_FILE  = os.path.join(DOCS_DIR, "Как_обрабатывать_свои_эмоции.pdf")
+CHECKLIST_FILE  = os.path.join(DOCS_DIR, "docs/Где я сейчас.pdf")
 
 CONSENT, EMAIL, PHONE, INSTAGRAM = range(4)
 
@@ -58,8 +58,7 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
     user = update.effective_user
     await update.message.reply_text(
         f"Привет, {user.first_name}! 👋\n\n"
-        "Сейчас пришлю тебе чек-лист по работе с эмоциями по методу O.W.E.C.A.N. — "
-        "практичный инструмент, к которому можно возвращаться снова и снова.\n\n"
+        "Сейчас пришлю тебе тест, на определение своего состояния.\n\n"
         "Сначала три коротких документа — формальность, но важная 🙏"
     )
     for filepath in [POLICY_FILE, CONSENT_FILE, NEWSLETTER_FILE]:
@@ -149,8 +148,8 @@ async def get_instagram(update: Update, context: ContextTypes.DEFAULT_TYPE) -> i
             document=f,
             filename="Как_обрабатывать_свои_эмоции.pdf",
             caption=(
-                "🎁 Держи свой чек-лист по методу O.W.E.C.A.N.!\n\n"
-                "Сохрани его — и возвращайся каждый раз, когда эмоции захлёстывают 🧡\n\n"
+                "А вот и сам тест!\n\n"
+                "Ответить на все вопросы и посчитай итоговый результат 🧡\n\n"
                 "Я буду присылать сюда ещё много полезного, так что пока не прощаемся! До скорого 👋\n\n"
                 "— Ирина @irina.ruleva.psy"
             )
