@@ -387,7 +387,7 @@ def main():
 
     test_handler = ConversationHandler(
         entry_points=[
-            CommandHandler("тест", test_start),
+            CommandHandler("test", test_start),
             CommandHandler("test", test_start),
         ],
         states=test_states,
