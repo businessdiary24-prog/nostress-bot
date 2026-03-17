@@ -24,7 +24,7 @@ DOCS_DIR        = "docs"
 POLICY_FILE     = os.path.join(DOCS_DIR, "Политика_обработки_ПД.pdf")
 CONSENT_FILE    = os.path.join(DOCS_DIR, "Согласие_на_обработку_ПД.pdf")
 NEWSLETTER_FILE = os.path.join(DOCS_DIR, "Согласие_на_рассылку.pdf")
-CHECKLIST_FILE  = os.path.join(DOCS_DIR, "docs/Где я сейчас.pdf")
+CHECKLIST_FILE  = os.path.join(DOCS_DIR, "Где_я_сейчас.pdf.pdf")
 
 CONSENT, EMAIL, PHONE, INSTAGRAM = range(4)
 
