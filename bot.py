@@ -13,7 +13,9 @@ from telegram.ext import (
 )
 
 logging.basicConfig(format="%(asctime)s - %(name)s - %(levelname)s - %(message)s", level=logging.INFO)
+logger.info(f"LEADS_CHAT_ID = '{os.getenv('LEADS_CHAT_ID')}'")
 logger = logging.getLogger(__name__)
+
 
 TOKEN          = os.getenv("BOT_TOKEN", "8784647952:AAHzGHp1LoN3wFSyMWdkuX3nboNpEsJbL_4")
 ADMIN_CHAT_ID  = os.getenv("ADMIN_CHAT_ID", "")   # твой личный чат — уведомления
