@@ -1,6 +1,7 @@
 import os
 import json
 import logging
+import asyncio
 from datetime import datetime
 import gspread
 from google.oauth2.service_account import Credentials
@@ -163,6 +164,10 @@ def save_lead(telegram_id, telegram_username, first_name, email, phone, instagra
 
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
     user = update.effective_user
+    # Устанавливаем кнопки меню бота
+    await context.bot.set_my_commands([
+        ("start", "Пройти тест на уровень стресса"),
+    ])
     await update.message.reply_text(
         f"Привет, {user.first_name}! 👋\n\n"
         "Сейчас пришлю тест на уровень стресса — и сразу пройдём его вместе прямо здесь.\n\n"
@@ -309,6 +314,7 @@ async def finish_quiz(query, context):
             logger.warning(f"Уведомление не отправлено: {e}")
 
     # Сообщение 1 — результат и описание зоны
+    await asyncio.sleep(0.5)
     await query.message.reply_text(
         f"Твой результат: {total} из 30 баллов\n\n"
         f"{result['emoji']} {result['title']}\n\n"
@@ -320,6 +326,7 @@ async def finish_quiz(query, context):
     )
 
     # Сообщение 2 — описание программы
+    await asyncio.sleep(2)
     await query.message.reply_text(
         "🌿 Программа Стабилизация\n"
         "Терапевтическая группа под руководством психолога Ирины Рулевой\n\n"
@@ -337,6 +344,7 @@ async def finish_quiz(query, context):
     )
 
     # Сообщение 3 — финальный призыв
+    await asyncio.sleep(2)
     await query.message.reply_text(
         "Хроническая усталость, выгорание, ощущение пустоты — всё это не навсегда. "
         "Нервная система умеет восстанавливаться. Тело умеет расслабляться. "
