@@ -15,8 +15,8 @@ from telegram.ext import (
 logging.basicConfig(format="%(asctime)s - %(name)s - %(levelname)s - %(message)s", level=logging.INFO)
 logger = logging.getLogger(__name__)
 
-TOKEN          = os.getenv("BOT_TOKEN", "8784647952:AAHzGHp1LoN3wFSyMWdkuX3nboNpEsJbL_4")
-LEADS_CHAT_ID  = os.getenv("LEADS_CHAT_ID", "")    # приватный канал — база лидов
+TOKEN         = "8784647952:AAHzGHp1LoN3wFSyMWdkuX3nboNpEsJbL_4"
+LEADS_CHAT_ID = "-1003778871933"
 
 DOCS_DIR        = "docs"
 POLICY_FILE     = os.path.join(DOCS_DIR, "Политика_обработки_ПД.pdf")
@@ -35,6 +35,339 @@ QUESTIONS = [
     "Тело напоминает о себе: головные боли, зажимы в шее и плечах, проблемы со сном или пищеварением.",
     "Я отдаляюсь от людей — меньше хочется общаться, отвечать на сообщения, быть на связи.",
     "У меня есть ощущение, что я работаю на автопилоте — делаю, что нужно, но как будто не присутствую.",
+    "Отдых не помогает: выходные или отпуск заканчиваются, а ощущение усталости остаётся.",
+    "Я ловлю себя на мысли я больше не могу так — но не понимаю, что именно менять.",
+]
+
+ANSWERS = [
+    ("Совсем не про меня", 0),
+    ("Иногда", 1),
+    ("Часто", 2),
+    ("Почти всегда", 3),
+]
+
+RESULTS = [
+    {
+        "min": 0, "max": 7,
+        "title": "Ресурсное состояние",
+        "emoji": "🟢",
+        "text": (
+            "Стресс есть — он есть у всех, кто живёт активной жизнью. "
+            "Но прямо сейчас ты с ним справляешься. У тебя есть ресурс: "
+            "энергия, способность радоваться, концентрация и желание быть в контакте с жизнью и людьми."
+        ),
+        "cta_personal": (
+            "Сейчас — лучшее время, чтобы научиться поддерживать себя "
+            "до того, как накопится усталость.\n\n"
+            "Строить защиту лучше не тогда, когда горит, а когда есть силы учиться. "
+            "Инструменты, освоенные в ресурсном состоянии, работают значительно эффективнее."
+        ),
+    },
+    {
+        "min": 8, "max": 15,
+        "title": "Хронический стресс",
+        "emoji": "🟡",
+        "text": (
+            "Нервная система работает в режиме повышенной нагрузки. "
+            "Ты ещё функционируешь — выполняешь задачи, держишь ритм. "
+            "Но это даётся с нарастающим усилием. Ресурс постепенно тает."
+        ),
+        "cta_personal": (
+            "Ты ещё не выгорела — но нервная система уже просит о помощи.\n\n"
+            "Сейчас у тебя есть и силы, и возможность действовать. "
+            "Ты находишься в точке, где ещё можно поймать процесс до того, как он стал выгоранием. "
+            "Хронический стресс не проходит сам — он либо прорабатывается, либо углубляется."
+        ),
+    },
+    {
+        "min": 16, "max": 23,
+        "title": "На пороге выгорания",
+        "emoji": "🟠",
+        "text": (
+            "Тело и психика посылают сигналы, которые уже сложно игнорировать. "
+            "Усталость не проходит после сна. Мотивация падает. "
+            "Эмоции тускнеют — или, наоборот, выходят из-под контроля в самые неожиданные моменты."
+        ),
+        "cta_personal": (
+            "Ты дошла до этой точки скорее всего потому, что долго несла слишком много.\n\n"
+            "Это не слабость характера. Это физиологическое состояние нервной системы, "
+            "которая работает в режиме аварийной экономии ресурсов. "
+            "Воля и взять себя в руки здесь не работают — нужны конкретные инструменты.\n\n"
+            "Пора позволить себе помощь."
+        ),
+    },
+    {
+        "min": 24, "max": 30,
+        "title": "Выгорание",
+        "emoji": "🔴",
+        "text": (
+            "Ты давно работаешь на износ. Возможно, ты уже привыкла к этому состоянию настолько, "
+            "что оно кажется тебе нормой. Но это не норма — это нервная система, "
+            "которая исчерпала ресурс восстановления и работает в режиме выживания."
+        ),
+        "cta_personal": (
+            "Хорошая новость: из выгорания выходят. "
+            "Нервная система способна восстанавливаться — при правильной поддержке и в правильном темпе.\n\n"
+            "Первый шаг — признать, где ты находишься. И ты уже сделала его, пройдя этот тест.\n\n"
+            "Ты заслуживаешь не просто выжить — ты заслуживаешь снова чувствовать себя живой."
+        ),
+    },
+]
+
+
+def get_result(score):
+    for r in RESULTS:
+        if r["min"] <= score <= r["max"]:
+            return r
+    return RESULTS[-1]
+
+
+def get_question_keyboard(idx):
+    buttons = []
+    for label, score in ANSWERS:
+        buttons.append([InlineKeyboardButton(label, callback_data="q_{}_{}".format(idx, score))])
+    return InlineKeyboardMarkup(buttons)
+
+
+async def save_lead(bot, telegram_id, telegram_username, first_name, email, phone, instagram, score=None, level=None):
+    if not LEADS_CHAT_ID:
+        logger.warning("LEADS_CHAT_ID не задан — лид не сохранён")
+        return
+    try:
+        score_line = "\n📊 Баллы: {} — {}".format(score, level) if score is not None else ""
+        text = (
+            "🆕 Новый лид!\n\n"
+            "👤 Имя: {}\n"
+            "💬 Telegram: {}\n"
+            "🆔 ID: {}\n"
+            "📧 Email: {}\n"
+            "📞 Телефон: {}\n"
+            "📸 Instagram: {}"
+            "{}\n"
+            "🕐 {}"
+        ).format(
+            first_name, telegram_username, telegram_id,
+            email, phone, instagram,
+            score_line,
+            datetime.now().strftime("%d.%m.%Y %H:%M")
+        )
+        await bot.send_message(chat_id=LEADS_CHAT_ID, text=text)
+        logger.info("Лид сохранён в канал: {}".format(email))
+    except Exception as e:
+        logger.error("Ошибка сохранения лида: {}".format(e))
+
+
+async def start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
+    user = update.effective_user
+    await context.bot.set_my_commands([
+        ("start", "Пройти тест на уровень стресса"),
+    ])
+    await update.message.reply_text(
+        "Привет, {}! 👋\n\n"
+        "Сейчас пришлю тест на уровень стресса — и сразу пройдём его вместе прямо здесь.\n\n"
+        "Сначала три коротких документа — формальность, но важная 🙏".format(user.first_name)
+    )
+    for filepath in [POLICY_FILE, CONSENT_FILE, NEWSLETTER_FILE]:
+        with open(filepath, "rb") as f:
+            await update.message.reply_document(document=f)
+    keyboard = [[InlineKeyboardButton("Ознакомилась и соглашаюсь", callback_data="consent_yes")]]
+    await update.message.reply_text(
+        "Нажимая кнопку, ты подтверждаешь согласие с политикой обработки "
+        "персональных данных и получением рассылки от Ирины Рулевой.",
+        reply_markup=InlineKeyboardMarkup(keyboard)
+    )
+    return CONSENT
+
+
+async def consent_given(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
+    query = update.callback_query
+    await query.answer()
+    await query.edit_message_text(
+        "Отлично! 🧡\n\n"
+        "Пару быстрых вопросов — меньше минуты.\n\n"
+        "На какую почту отправить тест?"
+    )
+    return EMAIL
+
+
+async def get_email(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
+    email = update.message.text.strip()
+    if "@" not in email or "." not in email:
+        await update.message.reply_text("Кажется, адрес неверный 😊 Попробуй ещё раз:")
+        return EMAIL
+    context.user_data["email"] = email
+    keyboard = [[KeyboardButton("Поделиться номером", request_contact=True)]]
+    await update.message.reply_text(
+        "Оставь номер телефона:",
+        reply_markup=ReplyKeyboardMarkup(keyboard, one_time_keyboard=True, resize_keyboard=True)
+    )
+    return PHONE
+
+
+async def get_phone(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
+    phone = update.message.contact.phone_number if update.message.contact else update.message.text.strip()
+    context.user_data["phone"] = phone
+    await update.message.reply_text(
+        "Как тебя найти в Instagram? (напиши username или нет)",
+        reply_markup=ReplyKeyboardRemove()
+    )
+    return INSTAGRAM
+
+
+async def get_instagram(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
+    context.user_data["instagram"] = update.message.text.strip()
+    context.user_data["answers"] = []
+
+    with open(TEST_FILE, "rb") as f:
+        await update.message.reply_document(
+            document=f,
+            caption=(
+                "Держи тест на уровень стресса!\n\n"
+                "А ещё — пройди интерактивный тест прямо здесь в боте: напиши /test\n"
+                "Я посчитаю баллы и расскажу, что они означают именно для тебя 🧡\n\n"
+                "— Ирина @irina.ruleva.psy"
+            )
+        )
+
+    await update.message.reply_text(
+        "Теперь пройдём тест здесь — 10 утверждений, займёт 2-3 минуты.\n\n"
+        "Оцени каждое утверждение честно — результат будет точнее 🧡"
+    )
+    await send_question(update.message, context, 0)
+    return QUIZ
+
+
+async def send_question(message_obj, context, idx):
+    text = "Вопрос {} из {}\n\n{}".format(idx + 1, len(QUESTIONS), QUESTIONS[idx])
+    await message_obj.reply_text(text, reply_markup=get_question_keyboard(idx))
+
+
+async def handle_answer(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
+    query = update.callback_query
+    await query.answer()
+
+    parts = query.data.split("_")
+    idx = int(parts[1])
+    score = int(parts[2])
+
+    answers = context.user_data.get("answers", [])
+    answers.append(score)
+    context.user_data["answers"] = answers
+
+    answer_label = ANSWERS[score][0]
+    await query.edit_message_text(
+        "Вопрос {} из {}\n\n{}\n\nВыбрано: {}".format(
+            idx + 1, len(QUESTIONS), QUESTIONS[idx], answer_label
+        )
+    )
+
+    next_idx = idx + 1
+    if next_idx < len(QUESTIONS):
+        await send_question(query.message, context, next_idx)
+        return QUIZ
+    else:
+        await finish_quiz(query, context)
+        return ConversationHandler.END
+
+
+async def finish_quiz(query, context):
+    user = query.from_user
+    answers = context.user_data.get("answers", [])
+    total = sum(answers)
+    result = get_result(total)
+
+    await save_lead(
+        bot=context.bot,
+        telegram_id=user.id,
+        telegram_username="@{}".format(user.username) if user.username else "—",
+        first_name=user.first_name or "—",
+        email=context.user_data.get("email", "—"),
+        phone=context.user_data.get("phone", "—"),
+        instagram=context.user_data.get("instagram", "—"),
+        score=total,
+        level=result["title"]
+    )
+
+    await asyncio.sleep(0.5)
+    await query.message.reply_text(
+        "Твой результат: {} из 30 баллов\n\n"
+        "{} {}\n\n"
+        "{}\n\n"
+        "{}\n\n"
+        "——\n"
+        "Этот тест — не клинический диагноз. Любой результат — это не приговор. "
+        "Это информация. И с любой точки можно начать движение к лучшему состоянию.".format(
+            total, result["emoji"], result["title"],
+            result["text"], result["cta_personal"]
+        )
+    )
+
+    await asyncio.sleep(2)
+    await query.message.reply_text(
+        "🌿 Программа Стабилизация\n"
+        "Терапевтическая группа под руководством психолога Ирины Рулевой\n\n"
+        "Это не лекции и не советы просто отдохни. "
+        "Это живая, поддерживающая работа с нервной системой и с теми паттернами мышления, "
+        "которые поддерживают стресс.\n\n"
+        "Что тебя ждёт:\n\n"
+        "Неделя 1 — Диагностика и первая помощь\n"
+        "Неделя 2 — Работа с незавершёнными стресс-циклами\n"
+        "Неделя 3 — Паттерны мышления, поддерживающие стресс\n"
+        "Неделя 4 — Ресурс и движение к целям\n\n"
+        "Программа ведётся психологом Ириной Рулевой — в формате, который сочетает "
+        "доказательные методы работы с нервной системой и тёплую, поддерживающую атмосферу. "
+        "Ты будешь в кругу людей, которые понимают, каково это — устать до самого дна."
+    )
+
+    await asyncio.sleep(2)
+    await query.message.reply_text(
+        "Хроническая усталость, выгорание, ощущение пустоты — всё это не навсегда. "
+        "Нервная система умеет восстанавливаться. Тело умеет расслабляться. "
+        "Жизнь умеет снова наполняться смыслом и радостью.\n\n"
+        "Восстановление начинается не с того момента, когда всё наладится само. "
+        "Оно начинается с момента, когда ты решаешь позаботиться о себе.\n\n"
+        "4 недели программы — структурированный путь к стабильности\n"
+        "1 шаг сейчас — написать слово Стресс в личные сообщения\n"
+        "0 обязательств — просто узнай об условиях без давления\n\n"
+        "Напиши слово Стресс Ирине: @IrinkaRuleva",
+        disable_web_page_preview=True
+    )
+
+
+async def cancel(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
+    await update.message.reply_text(
+        "Окей, до встречи! Напиши /start чтобы вернуться 👋",
+        reply_markup=ReplyKeyboardRemove()
+    )
+    return ConversationHandler.END
+
+
+def main():
+    app = Application.builder().token(TOKEN).build()
+
+    conv_handler = ConversationHandler(
+        entry_points=[CommandHandler("start", start)],
+        states={
+            CONSENT:   [CallbackQueryHandler(consent_given, pattern="^consent_yes$")],
+            EMAIL:     [MessageHandler(filters.TEXT & ~filters.COMMAND, get_email)],
+            PHONE:     [
+                MessageHandler(filters.CONTACT, get_phone),
+                MessageHandler(filters.TEXT & ~filters.COMMAND, get_phone)
+            ],
+            INSTAGRAM: [MessageHandler(filters.TEXT & ~filters.COMMAND, get_instagram)],
+            QUIZ:      [CallbackQueryHandler(handle_answer, pattern="^q_")],
+        },
+        fallbacks=[CommandHandler("cancel", cancel)],
+        allow_reentry=True,
+    )
+
+    app.add_handler(conv_handler)
+    logger.info("Бот nostressbyruleva запущен!")
+    app.run_polling(allowed_updates=Update.ALL_TYPES)
+
+
+if __name__ == "__main__":
+    main()    "У меня есть ощущение, что я работаю на автопилоте — делаю, что нужно, но как будто не присутствую.",
     "Отдых не помогает: выходные или отпуск заканчиваются, а ощущение усталости остаётся.",
     "Я ловлю себя на мысли я больше не могу так — но не понимаю, что именно менять.",
 ]
