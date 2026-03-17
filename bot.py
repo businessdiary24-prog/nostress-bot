@@ -3,8 +3,6 @@ import json
 import logging
 import asyncio
 from datetime import datetime
-import gspread
-from google.oauth2.service_account import Credentials
 from telegram import (
     Update, InlineKeyboardButton, InlineKeyboardMarkup,
     KeyboardButton, ReplyKeyboardMarkup, ReplyKeyboardRemove
@@ -19,7 +17,6 @@ logger = logging.getLogger(__name__)
 
 TOKEN          = os.getenv("BOT_TOKEN", "8784647952:AAHzGHp1LoN3wFSyMWdkuX3nboNpEsJbL_4")
 ADMIN_CHAT_ID  = os.getenv("ADMIN_CHAT_ID", "")
-SPREADSHEET_ID = os.getenv("SPREADSHEET_ID", "1md6HVQOGNa3S1GYtx9TTq-YKXs9sX8hpdnYvute0uM8")
 
 DOCS_DIR        = "docs"
 POLICY_FILE     = os.path.join(DOCS_DIR, "Политика_обработки_ПД.pdf")
@@ -132,34 +129,28 @@ def get_question_keyboard(idx):
     return InlineKeyboardMarkup(buttons)
 
 
-def get_sheet():
-    creds_json = os.getenv("GOOGLE_CREDENTIALS")
-    if not creds_json:
-        raise ValueError("GOOGLE_CREDENTIALS не задана")
-    creds_dict = json.loads(creds_json)
-    scopes = [
-        "https://www.googleapis.com/auth/spreadsheets",
-        "https://www.googleapis.com/auth/drive"
-    ]
-    creds = Credentials.from_service_account_info(creds_dict, scopes=scopes)
-    client = gspread.authorize(creds)
-    return client.open_by_key(SPREADSHEET_ID).sheet1
-
-
-def save_lead(telegram_id, telegram_username, first_name, email, phone, instagram, score=None, level=None):
+async def save_lead(bot, telegram_id, telegram_username, first_name, email, phone, instagram, score=None, level=None):
+    """Сохраняет лид в приватный Telegram-канал."""
+    if not ADMIN_CHAT_ID:
+        logger.warning("ADMIN_CHAT_ID не задан — лид не сохранён")
+        return
     try:
-        sheet = get_sheet()
-        if not sheet.cell(1, 1).value:
-            sheet.append_row(["Дата", "TG ID", "Telegram", "Имя", "Email", "Телефон", "Instagram", "Баллы", "Уровень"])
-        sheet.append_row([
-            datetime.now().strftime("%d.%m.%Y %H:%M"),
-            str(telegram_id), telegram_username, first_name,
-            email, phone, instagram,
-            score or "", level or ""
-        ])
-        logger.info(f"Лид сохранён: {email}, баллы: {score}")
+        score_line = f"\n📊 Баллы: {score} — {level}" if score is not None else ""
+        text = (
+            f"🆕 Новый лид!\n\n"
+            f"👤 Имя: {first_name}\n"
+            f"💬 Telegram: {telegram_username}\n"
+            f"🆔 ID: {telegram_id}\n"
+            f"📧 Email: {email}\n"
+            f"📞 Телефон: {phone}\n"
+            f"📸 Instagram: {instagram}"
+            f"{score_line}\n"
+            f"🕐 {datetime.now().strftime('%d.%m.%Y %H:%M')}"
+        )
+        await bot.send_message(chat_id=ADMIN_CHAT_ID, text=text)
+        logger.info(f"Лид сохранён в канал: {email}")
     except Exception as e:
-        logger.error(f"Ошибка Google Sheets: {e}")
+        logger.error(f"Ошибка сохранения лида: {e}")
 
 
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
@@ -284,7 +275,8 @@ async def finish_quiz(query, context):
     total = sum(answers)
     result = get_result(total)
 
-    save_lead(
+    await save_lead(
+        bot=context.bot,
         telegram_id=user.id,
         telegram_username=f"@{user.username}" if user.username else "—",
         first_name=user.first_name or "—",
@@ -295,23 +287,7 @@ async def finish_quiz(query, context):
         level=result["title"]
     )
 
-    if ADMIN_CHAT_ID:
-        try:
-            await context.bot.send_message(
-                chat_id=ADMIN_CHAT_ID,
-                text=(
-                    f"Новый лид + тест!\n\n"
-                    f"Имя: {user.first_name}\n"
-                    f"Telegram: @{user.username or '—'}\n"
-                    f"Email: {context.user_data.get('email')}\n"
-                    f"Телефон: {context.user_data.get('phone')}\n"
-                    f"Instagram: {context.user_data.get('instagram')}\n"
-                    f"Баллы: {total} — {result['emoji']} {result['title']}\n"
-                    f"Время: {datetime.now().strftime('%d.%m.%Y %H:%M')}"
-                )
-            )
-        except Exception as e:
-            logger.warning(f"Уведомление не отправлено: {e}")
+
 
     # Сообщение 1 — результат и описание зоны
     await asyncio.sleep(0.5)
